@@ -31,10 +31,12 @@ class Data(object):
         self.deps.append('_')
 
     def get_file_data(self, filename):
-        data_dicts = []
+        data_dicts, data_trees = [], []
         with open(filename, 'r') as ftrain:
             data_raw = ftrain.read()
             data_dicts_raw = parse(data_raw)
+
+            # Create data dict with categorical variables
             for ddicts in data_dicts_raw:
                 sentence_dicts = []
                 for ddict in ddicts:
@@ -45,12 +47,20 @@ class Data(object):
                          'postag': self.postags.index(ddict['upostag']), 'dep': self.deps.index(ddict['deprel'])})
                 data_dicts.append(sentence_dicts)
 
-            data_tree_raw = parse_tree(data_raw)
-            print(data_tree_raw[0])
-            # data_tree = []
-            for tree_raw in data_tree_raw:
-                pass
-            # print_tree(train_tree[0])
+            # Create data-tree
+            data_trees_raw = parse_tree(data_raw)
+            for tree in data_trees_raw:
+                data_trees.append(self.add_tree_edges(tree, []))
+
+        return data_dicts, data_trees
+
+    def add_tree_edges(self, tree_node, data_tree):
+        # Recursively travel tree and add edges to data_tree
+        if tree_node.children:
+            for child in tree_node.children:
+                data_tree.append(tree_node.data['id'], child.data['deprel'], child.data['id'])
+                data_tree = self.add_tree_edges(child, data_tree)
+        return data_tree
 
 
 data = Data()
