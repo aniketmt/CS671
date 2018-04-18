@@ -57,53 +57,75 @@ class Data(object):
         return data_list
 
     def get_transitions(self, word_list, edge_list):
-        sigma = ['0']
+        sigma = ['Root']
         beta = [word['id'] for word in word_list]
-        heads = [edge['head'] for edge in edge_list]  # to check right-arc condition
-        trans = []                                    # 0 for shift, 1 for left-arc, 2 for right arc
+        edges = [(edge['head'], edge['dep']) for edge in edge_list]  # to check right-arc condition
+        cedges = []
+        configs, trans = [], []  # 0 for shift, 1 for left-arc, 2 for right arc
 
         while len(beta) > 1:
+            configs.append([sigma, beta, cedges])
+
+            if len(sigma) == 1:
+                trans.append((0, None))
+                sigma.append(beta.pop())
+                continue
+
             sigma0 = sigma.pop()
             beta0 = beta.pop()
+            arc_flag = False
+
             for edge in edge_list:
                 if beta0 == edge['head'] and sigma0 == edge['dep']:
                     # Left-arc
                     trans.append((1, edge['deprel']))
-                    heads.remove(beta0)
+                    edges.remove((beta0, sigma0))
+                    cedges.append((beta0, sigma0))
                     beta.append(beta0)
+                    arc_flag = True
+                    break
+
                 elif sigma0 == edge['head'] and beta0 == edge['dep']:
-                    if beta0 in heads:
-                        # Shift
-                        trans.append((0, None))
-                        sigma.append(sigma0)
-                        sigma.append(beta0)
+                    if beta0 in [edge2[0] for edge2 in edges]:
+                        continue
                     else:
                         # Right-arc
                         trans.append((2, edge['deprel']))
-                        heads.remove(sigma0)
+                        edges.remove((sigma0, beta0))
+                        cedges.append((sigma0, beta0))
                         beta.append(sigma0)
-                else:
-                    # Shift
-                    trans.append((0, None))
-                    sigma.append(sigma0)
-                    sigma.append(beta0)
+                        arc_flag = True
+                        break
 
-        return np.array(trans)
+            if not arc_flag:
+                # Shift
+                trans.append((0, None))
+                sigma.append(sigma0)
+                sigma.append(beta0)
+
+        configs.append([sigma, beta, cedges])
+        trans.append((2, self.deps.index('root')))
+
+        return np.array(configs), np.array(trans)
 
     def get_data(self, train=0):
         train_list = self.get_file_data(self.data_file[train])
         train_data = []
         for sentence in train_list:
             word_list, edge_list = sentence
-            trans = self.get_transitions(word_list, edge_list)
-            train_data.append([word_list, trans])
+            configs, trans = self.get_transitions(word_list, edge_list)
+            tdata = []
+            for i in range(configs.shape[0]):
+                tdata.append([configs[i], trans[i]])
+            train_data.append([word_list, tdata])
         return train_data
 
 
 def test_Data():
     data = Data()
     data_list = data.get_data()
-    print(data_list[50])
+    print(data_list[49][0])
+    print(data_list[49][1])
 
 
 test_Data()
