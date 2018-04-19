@@ -57,52 +57,61 @@ class Data(object):
         return data_list
 
     def get_transitions(self, word_list, edge_list):
-        # print('word list {0}, edge_list {1}'.format(len(word_list), len(edge_list)))
+        print('word list {0}, edge_list {1}'.format(len(word_list), len(edge_list)))
         sigma = ['0']
         beta = [word['id'] for word in word_list]
-
-        heads = {edge['dep']: edge['head'] for edge in edge_list}
-        rels = {edge['dep']: edge['deprel'] for edge in edge_list}  # to check right-arc condition
-
+        edges = [(edge['head'], edge['dep']) for edge in edge_list]  # to check right-arc condition
         cedges = []              # list of edges for config
         configs, trans = [], []  # 0 for shift, 1 for left-arc, 2 for right arc
-        count = 0
 
-        while len(beta) > 0:
+        while len(edges) > 1:
             configs.append([sigma, beta, cedges])
 
             if len(sigma) == 1:
+                print('Shift1')
                 trans.append((0, None))
-                sigma.insert(0, beta.pop(0))
-
-            elif sigma[0] in heads and heads[sigma[0]] == beta[0]:
-                trans.append((1, rels[sigma[0]]))
-                heads.pop(sigma[0], None)
-                cedges.append([beta[0], rels[sigma[0]], sigma[0]])
-                sigma.pop(0)
-
+                sigma.append(beta.pop())
+            
             else:
-                head_flag = False
-                for key in heads:
-                    if heads[key] == beta[0]:
-                        head_flag = True
-                        break
-                if head_flag == False and heads[beta[0]] == sigma[0]:
-                    trans.append((2, rels[beta[0]]))
-                    heads.pop(beta[0], None)
-                    cedges.append([sigma[0], rels[beta[0]], beta[0]])
-                    beta.pop(0)
-                    beta.insert(0, sigma.pop(0))
-                else:
-                    trans.append((0, None))
-                    sigma.insert(0, beta.pop(0))
-            count += 1
+                sigma0 = sigma.pop()
+                beta0 = beta.pop()
 
+                for edge in edge_list:
+                    if beta0 == edge['head'] and sigma0 == edge['dep']:
+                        # Left-arc
+                        print('Left-arc')
+                        trans.append((1, edge['deprel']))
+                        edges.remove((beta0, sigma0))
+                        cedges.append((beta0, sigma0))
+                        beta.append(beta0)
+                        break
+
+                else:
+                    if beta0 not in [edge2[0] for edge2 in edges]:
+                        for edge in edge_list:
+                            if sigma0 == edge['head'] and beta0 == edge['dep']:
+                                # Right-arc
+                                print('Right arc')
+                                trans.append((2, edge['deprel']))
+                                edges.remove((sigma0, beta0))
+                                cedges.append((sigma0, beta0))
+                                beta.append(sigma0)
+                                break
+                    else:
+                        # Shift
+                        print('Shift2')
+                        trans.append((0, None))
+                        sigma.append(sigma0)
+                        sigma.append(beta0)
+
+            print('sigma: ', sigma)
+            print('beta: ', beta)
+            print('edges: ', edges)
+
+        # assert len(cedges) == len(edge_list) - 1
+        print(len(edges), len(cedges), len(edge_list))
         configs.append([sigma, beta, cedges])
         trans.append((2, self.deps.index('root')))
-
-        if len(cedges) < len(edge_list) - 1:
-            configs, trans = [], []
 
         return np.array(configs), np.array(trans)
 
@@ -119,11 +128,10 @@ class Data(object):
 def test_Data():
     data = Data()
     data_list = data.get_data()
+    c = list(zip(data_list[49][1], data_list[49][2]))
+    print(c[0])
+    print(c[-2])
+    print(c[-1])
 
-    print(data_list[49][1][0])
-    print(data_list[49][2][0])
-    print('\n', data_list[49][1][-1])
-    print(data_list[49][2][-1])
 
-
-# test_Data()
+test_Data()
